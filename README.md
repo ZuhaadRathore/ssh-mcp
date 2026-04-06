@@ -175,7 +175,6 @@ Each session has its own shell process with its own cwd, environment, and state.
 ## Development
 
 ```bash
-npm run dev        # run without building (tsx)
 npm run build      # compile to dist/
 npm test           # unit + MCP-layer tests (no SSH needed)
 npm run test:integration  # real SSH tests (requires a live server)
@@ -219,4 +218,4 @@ src/
 
 ## License
 
-ISC
+MIT
