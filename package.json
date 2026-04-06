@@ -1,0 +1,30 @@
+{
+  "name": "ssh-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for SSH remote access",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "test": "vitest run tests/unit tests/mcp",
+    "test:integration": "vitest run tests/integration",
+    "test:watch": "vitest tests/unit tests/mcp"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@rollup/rollup-win32-x64-msvc": "^4.60.1",
+    "ssh2": "^1.17.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.2",
+    "@types/ssh2": "^1.15.5",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2",
+    "vitest": "^2.1.9"
+  }
+}
