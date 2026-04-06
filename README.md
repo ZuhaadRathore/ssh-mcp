@@ -178,10 +178,20 @@ Each session has its own shell process with its own cwd, environment, and state.
 npm run dev        # run without building (tsx)
 npm run build      # compile to dist/
 npm test           # unit + MCP-layer tests (no SSH needed)
-npm run test:integration  # real SSH tests (requires SSH_HOST etc.)
+npm run test:integration  # real SSH tests (requires a live server)
 ```
 
-Integration tests are automatically skipped when `SSH_HOST` is not set.
+Unit and MCP-layer tests run with no SSH connection — no setup needed.
+
+Integration tests require a real server. Copy `.env.example` to `.env` and fill in your credentials:
+
+```bash
+cp .env.example .env
+# edit .env with your SSH_HOST, SSH_USER, SSH_PASSWORD
+npm run test:integration
+```
+
+The `.env` file is only read by the test runner — it is not used by the MCP server itself. Integration tests are automatically skipped when `SSH_HOST` is not set.
 
 ---
 

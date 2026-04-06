@@ -23,6 +23,7 @@
   "devDependencies": {
     "@types/node": "^25.5.2",
     "@types/ssh2": "^1.15.5",
+    "dotenv": "^17.4.1",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",
     "vitest": "^2.1.9"

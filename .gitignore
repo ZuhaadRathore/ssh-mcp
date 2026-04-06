@@ -1,6 +1,7 @@
 node_modules/
 dist/
 jobs.json
+.env
 
 # Compiled output outside dist/
 **/*.js.map
