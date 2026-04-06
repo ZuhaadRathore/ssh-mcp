@@ -1,12 +1,12 @@
 # ssh-mcp
 
-An MCP (Model Context Protocol) server that gives Claude Code a persistent, stateful connection to a remote SSH server. Claude can run commands, edit files, manage background jobs, and inspect the system exactly as it would work locally — no manual `ssh` wrappers needed.
+An MCP (Model Context Protocol) server that gives Claude Code a persistent, stateful connection to a remote SSH server. Claude can run commands, edit files, manage background jobs, and inspect the system exactly as it would work locally.
 
 ---
 
 ## How it works
 
-A single SSH connection is kept open for the lifetime of the server. Commands run inside persistent no-PTY shell sessions, so state (working directory, environment variables, activated virtualenvs, etc.) carries across calls. File operations go through the SFTP subsystem for binary safety. All of this is invisible to Claude — it just calls tools.
+A single SSH connection is kept open for the lifetime of the server. Commands run inside persistent no-PTY shell sessions, so state (working directory, environment variables, activated virtualenvs, etc.) carries across calls. File operations go through the SFTP subsystem for binary safety. 
 
 ---
 
