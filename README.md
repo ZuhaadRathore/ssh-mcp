@@ -1,5 +1,11 @@
 # ssh-mcp
 
+[![Node.js](https://img.shields.io/badge/node-%3E%3D18-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
+[![TypeScript](https://img.shields.io/badge/typescript-5.x-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![MCP](https://img.shields.io/badge/protocol-MCP-111827?style=for-the-badge)](https://modelcontextprotocol.io/)
+[![SSH](https://img.shields.io/badge/transport-SSH-0F766E?style=for-the-badge)](https://www.ssh.com/academy/ssh/protocol)
+[![License: MIT](https://img.shields.io/badge/license-MIT-22C55E?style=for-the-badge)](./LICENSE)
+
 An MCP (Model Context Protocol) server that gives Claude Code a persistent, stateful connection to a remote SSH server. Claude can run commands, edit files, manage background jobs, and inspect the system exactly as it would work locally.
 
 ---
