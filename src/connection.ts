@@ -9,7 +9,7 @@
  * the underlying SSH socket drops.
  */
 import { Client } from "ssh2";
-import { sshConfig } from "./config.js";
+import { getActiveSshConfig } from "./config.js";
 
 let client: Client | null = null;
 let connecting = false;
@@ -52,7 +52,7 @@ export function getConnection(): Promise<Client> {
       client = null;
       closeHandlers.forEach(fn => fn());
     })
-    .connect(sshConfig);
+    .connect(getActiveSshConfig());
   });
 }
 

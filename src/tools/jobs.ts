@@ -14,6 +14,8 @@ import { z } from "zod";
 import { getSession } from "../shell.js";
 import { jobs, saveJobs } from "../jobs.js";
 import { fmt, q } from "../helpers.js";
+import { logCommandAudit } from "../audit.js";
+import { auditIds } from "../tool-context.js";
 
 /** Register ssh_job_output, ssh_job_list, and ssh_job_kill tools on the given MCP server. */
 export function registerJobTools(server: McpServer): void {
@@ -38,6 +40,16 @@ export function registerJobTools(server: McpServer): void {
       ].join("; ");
 
       const r = await getSession("default").exec(checkCmd, 15000);
+      logCommandAudit({
+        action: "job_output",
+        tool: "ssh_job_output",
+        command: checkCmd,
+        success: r.code === 0,
+        exitCode: r.code,
+        timeoutMs: 15000,
+        ids: auditIds("default", id),
+        metadata: { tail },
+      });
       const statusLine = r.stdout.match(/STATUS:(\S+)/)?.[1] ?? "unknown";
       const exitCode = r.stdout.match(/EXIT:(\S+)/)?.[1] ?? "";
       const sep = r.stdout.indexOf("---\n");
@@ -69,6 +81,15 @@ export function registerJobTools(server: McpServer): void {
           `if kill -0 ${job.pid} 2>/dev/null; then echo running; elif [ -f ${q(job.exitFile)} ]; then echo "done($(cat ${q(job.exitFile)}))"; else echo unknown; fi`,
           5000
         );
+        logCommandAudit({
+          action: "job_list_probe",
+          tool: "ssh_job_list",
+          command: `job status probe for PID ${job.pid}`,
+          success: r.code === 0,
+          exitCode: r.code,
+          timeoutMs: 5000,
+          ids: auditIds("default", job.id),
+        });
         lines.push(`[${job.id}] PID:${job.pid}  ${r.stdout.trim().padEnd(10)}  ${job.label}`);
       }
       return { content: [{ type: "text", text: lines.join("\n") }] };
@@ -85,9 +106,20 @@ export function registerJobTools(server: McpServer): void {
     async ({ id, force }) => {
       const job = jobs.get(id);
       if (!job) return { content: [{ type: "text", text: `Unknown job ID: ${id}` }] };
-      const r = await getSession("default").exec(`kill ${force ? "-9" : "-15"} ${job.pid} 2>&1`, 5000);
+      const command = `kill ${force ? "-9" : "-15"} ${job.pid} 2>&1`;
+      const r = await getSession("default").exec(command, 5000);
       jobs.delete(id);
       saveJobs();
+      logCommandAudit({
+        action: "job_kill",
+        tool: "ssh_job_kill",
+        command,
+        success: r.code === 0,
+        exitCode: r.code,
+        timeoutMs: 5000,
+        ids: auditIds("default", id),
+        metadata: { force, pid: job.pid },
+      });
       return { content: [{ type: "text", text: r.code === 0 ? `Killed job ${id} (PID ${job.pid})` : fmt(r) }] };
     }
   );

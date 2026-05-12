@@ -15,6 +15,9 @@ import { z } from "zod";
 import { getSession } from "../shell.js";
 import { jobs, saveJobs } from "../jobs.js";
 import { fmt } from "../helpers.js";
+import { logCommandAudit } from "../audit.js";
+import { auditIds } from "../tool-context.js";
+import { assertActiveCommandAllowed, policyFailureText } from "../runtime-policy.js";
 
 /** Register ssh_exec and ssh_exec_bg tools on the given MCP server. */
 export function registerExecTools(server: McpServer): void {
@@ -27,7 +30,35 @@ export function registerExecTools(server: McpServer): void {
       timeout: z.number().optional().describe("Timeout in seconds (default: 60)"),
     },
     async ({ command, session, timeout }) => {
+      const started = Date.now();
+      const timeoutMs = (timeout ?? 60) * 1000;
+      try {
+        assertActiveCommandAllowed(command);
+      } catch (err) {
+        logCommandAudit({
+          action: "exec",
+          tool: "ssh_exec",
+          command,
+          success: false,
+          timeoutMs,
+          durationMs: Date.now() - started,
+          ids: auditIds(session),
+          metadata: { reason: "policy" },
+        });
+        return { content: [{ type: "text", text: policyFailureText(err) }] };
+      }
+
       const r = await getSession(session).exec(command, (timeout ?? 60) * 1000);
+      logCommandAudit({
+        action: "exec",
+        tool: "ssh_exec",
+        command,
+        success: r.code === 0,
+        exitCode: r.code,
+        timeoutMs,
+        durationMs: Date.now() - started,
+        ids: auditIds(session),
+      });
       return { content: [{ type: "text", text: fmt(r) }] };
     }
   );
@@ -40,6 +71,23 @@ export function registerExecTools(server: McpServer): void {
       label: z.string().optional().describe("Human-readable label for this job"),
     },
     async ({ command, label }) => {
+      const started = Date.now();
+      try {
+        assertActiveCommandAllowed(command);
+      } catch (err) {
+        logCommandAudit({
+          action: "exec_bg_start",
+          tool: "ssh_exec_bg",
+          command,
+          success: false,
+          timeoutMs: 10000,
+          durationMs: Date.now() - started,
+          ids: auditIds("default"),
+          metadata: { reason: "policy" },
+        });
+        return { content: [{ type: "text", text: policyFailureText(err) }] };
+      }
+
       const id = randomBytes(4).toString("hex");
       const outFile = `/tmp/.mcpjob_${id}.out`;
       const exitFile = `/tmp/.mcpjob_${id}.exit`;
@@ -47,10 +95,32 @@ export function registerExecTools(server: McpServer): void {
       const r = await getSession("default").exec(wrapped, 10000);
       const pid = parseInt(r.stdout.trim(), 10);
       if (isNaN(pid)) {
+        logCommandAudit({
+          action: "exec_bg_start",
+          tool: "ssh_exec_bg",
+          command,
+          success: false,
+          exitCode: r.code,
+          timeoutMs: 10000,
+          durationMs: Date.now() - started,
+          ids: auditIds("default", id),
+          metadata: { label: label ?? command },
+        });
         return { content: [{ type: "text", text: `Failed to start job:\n${fmt(r)}` }] };
       }
       jobs.set(id, { id, pid, command, label: label ?? command, outFile, exitFile, startedAt: new Date().toISOString() });
       saveJobs();
+      logCommandAudit({
+        action: "exec_bg_start",
+        tool: "ssh_exec_bg",
+        command,
+        success: true,
+        exitCode: r.code,
+        timeoutMs: 10000,
+        durationMs: Date.now() - started,
+        ids: auditIds("default", id),
+        metadata: { label: label ?? command, pid, outFile, exitFile },
+      });
       return { content: [{ type: "text", text: `Job started\nID:     ${id}\nPID:    ${pid}\nLabel:  ${label ?? command}\nOutput: ${outFile}` }] };
     }
   );

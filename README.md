@@ -4,13 +4,22 @@
 [![TypeScript](https://img.shields.io/badge/typescript-5.x-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-22C55E?style=for-the-badge)](./LICENSE)
 
-An MCP (Model Context Protocol) server that gives Claude Code a persistent, stateful connection to a remote SSH server. Claude can run commands, edit files, manage background jobs, and inspect the system exactly as it would work locally.
+An MCP (Model Context Protocol) server that provides a persistent, stateful SSH connection for MCP clients like Claude Code and Codex.
+
+You can run commands, edit files, manage background jobs, inspect system state, and now manage multiple SSH server profiles at runtime.
 
 ---
 
-## How it works
+## Highlights
 
-A single SSH connection is kept open for the lifetime of the server. Commands run inside persistent no-PTY shell sessions, so state (working directory, environment variables, activated virtualenvs, etc.) carries across calls. File operations go through the SFTP subsystem for binary safety. 
+- Persistent shell sessions (`ssh_exec`) with stateful cwd/env per session
+- Binary-safe file operations via SFTP
+- Background jobs with persisted tracking (`jobs.json`)
+- Runtime server profile management:
+  - `ssh_server_list`
+  - `ssh_server_add`
+  - `ssh_server_use`
+  - `ssh_server_remove`
 
 ---
 
@@ -19,54 +28,100 @@ A single SSH connection is kept open for the lifetime of the server. Commands ru
 ### Prerequisites
 
 - Node.js 18+
-- A remote server accessible over SSH
-- Claude Code CLI
+- An SSH-reachable server
+- Claude Code and/or Codex
 
-### Install
+### Install and build
 
 ```bash
-git clone https://github.com/ZuhaadRathore/ssh-mcp.git
-cd ssh-mcp
 npm install
 npm run build
 ```
 
-### Register with Claude Code
+### One-command runtime via npx
+
+After publishing, clients can launch this MCP server with:
+
+```bash
+npx -y @tavuc/ssh-mcp
+```
+
+### Optional workspace-targeted install commands
+
+This repo defines two npm workspaces: `codex` and `claude-code`.
+
+```bash
+npm install -w codex
+npm install -w claude-code
+npm install -w codex -w claude-code
+```
+
+Note: npm does not support `-w:codex/claude-code` syntax. Use repeated `-w` flags.
+
+---
+
+## Configure server profiles
+
+Profiles are stored in:
+
+- `SSH_SERVERS_FILE` if set, otherwise
+- `~/.ssh-mcp/servers.json`
+
+You can bootstrap with env vars (legacy path), then manage profiles through MCP tools.
+
+### Env bootstrap (optional)
+
+```bash
+SSH_HOST=your.server.com
+SSH_USER=youruser
+SSH_PASSWORD=yourpassword
+# or SSH_KEY_PATH=/path/to/private/key
+# optional: SSH_PORT=22
+# optional: SSH_PROFILE=default
+```
+
+After startup, use `ssh_server_add` / `ssh_server_use` for day-to-day profile management.
+
+Security note: profile passwords are stored in plain text in the profile JSON file. Prefer key-based auth where possible.
+
+---
+
+## Register with Claude Code
 
 ```bash
 claude mcp add-json -s user ssh-remote '{
   "type": "stdio",
-  "command": "node",
-  "args": ["/absolute/path/to/ssh-mcp/dist/index.js"],
+  "command": "npx",
+  "args": ["-y", "@tavuc/ssh-mcp"],
   "env": {
-    "SSH_HOST": "your.server.com",
-    "SSH_USER": "youruser",
-    "SSH_PASSWORD": "yourpassword"
+    "SSH_PROFILE": "default"
   }
 }'
 ```
 
-Use `SSH_KEY_PATH` instead of `SSH_PASSWORD` to authenticate with a private key:
-
-```json
-"SSH_KEY_PATH": "/home/you/.ssh/id_rsa"
-```
-
-Optional: set `SSH_PORT` if your server doesn't use port 22.
-
-Restart Claude Code after registering. Verify it loaded with `/mcp`.
+Restart Claude Code and verify with `/mcp`.
 
 ---
 
-## Environment variables
+## Register with Codex
 
-| Variable | Required | Description |
-|---|---|---|
-| `SSH_HOST` | Yes | Remote hostname or IP |
-| `SSH_USER` | Yes | Remote username |
-| `SSH_PASSWORD` | One of these | Password authentication |
-| `SSH_KEY_PATH` | One of these | Path to PEM private key |
-| `SSH_PORT` | No | Remote port (default: `22`) |
+Add this block to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.ssh_remote]
+command = "npx"
+args = ["-y", "@tavuc/ssh-mcp"]
+env = { SSH_PROFILE = "default" }
+```
+
+Then restart Codex.
+
+Client-specific templates are also included:
+
+- `clients/codex/mcp-server.toml.example`
+- `clients/claude-code/mcp-server.json.example`
+
+If you are running from a local clone (not a published npm package), keep using `node .../dist/index.js`.
 
 ---
 
@@ -76,146 +131,165 @@ Restart Claude Code after registering. Verify it loaded with `/mcp`.
 
 | Tool | Description |
 |---|---|
-| `ssh_exec` | Run a command in a named, persistent shell session. Shell state (cwd, env vars, venvs) persists across calls within the same session. |
-| `ssh_exec_bg` | Start a long-running command in the background. Returns a job ID immediately — use `ssh_job_output` to poll. |
-
-**`ssh_exec` parameters:**
-- `command` — the shell command to run
-- `session` — named session (default: `"default"`); use multiple for parallel contexts
-- `timeout` — timeout in seconds (default: 60)
-
-**`ssh_exec_bg` parameters:**
-- `command` — the command to run in the background
-- `label` — optional human-readable label
-
----
+| `ssh_exec` | Run a command in a named, persistent shell session. |
+| `ssh_exec_bg` | Start a long-running command in the background. |
+| `ssh_exec_sudo` | Run a command through `sudo -n` after a short-lived confirmation token flow. |
 
 ### Background jobs
 
 | Tool | Description |
 |---|---|
 | `ssh_job_output` | Get current output and status (`running` / `done`) of a background job. |
-| `ssh_job_list` | List all tracked background jobs with their live status. |
-| `ssh_job_kill` | Kill a running background job (SIGTERM by default, SIGKILL with `force: true`). |
-
-**`ssh_job_output` parameters:**
-- `id` — job ID from `ssh_exec_bg`
-- `tail` — only show last N lines of output (default: all)
-
-Jobs are persisted to `jobs.json` and survive MCP server restarts.
-
----
+| `ssh_job_list` | List tracked background jobs and live status. |
+| `ssh_job_kill` | Kill a running background job. |
 
 ### Files
 
 | Tool | Description |
 |---|---|
-| `ssh_read_file` | Read a file. Supports partial reads with `offset` and `limit` (1-based line numbers) for large files. |
-| `ssh_write_file` | Write content to a path via SFTP. Auto-creates parent directories. Binary-safe. |
-| `ssh_edit_file` | Exact find-and-replace on a remote file. Fails if `old_string` is not found or matches more than once (unless `replace_all` is set) — prevents accidental edits. |
-| `ssh_delete` | Delete a file or directory (`recursive: true` for non-empty directories). |
-| `ssh_move` | Move or rename a file/directory. |
+| `ssh_read_file` | Read remote files, including partial reads with `offset`/`limit`. |
+| `ssh_write_file` | Write file content via SFTP (auto-creates parent directories). |
+| `ssh_edit_file` | Safe exact replacement with ambiguity guardrails, optional SHA256 precondition, and `dry_run` patch preview. |
+| `ssh_delete` | Delete files/directories (`recursive` for non-empty dirs). |
+| `ssh_move` | Move/rename files and directories. |
 | `ssh_chmod` | Change file permissions. |
-| `ssh_tail` | Read the last N lines of a file — useful for logs. |
+| `ssh_tail` | Tail the last N lines of a file. |
 
-**`ssh_edit_file` parameters:**
-- `path` — remote file path
-- `old_string` — exact string to find (must match character-for-character)
-- `new_string` — replacement string
-- `replace_all` — replace every occurrence instead of requiring uniqueness (default: `false`)
-
----
-
-### Directory & search
+### Directory and search
 
 | Tool | Description |
 |---|---|
-| `ssh_list_dir` | List a directory via SFTP. Pass `long: true` for permissions, size, owner, and mtime. |
-| `ssh_stat` | Get metadata for a path: type, size, permissions, uid/gid, modified/accessed timestamps. |
-| `ssh_find` | Find files by name pattern and/or content. Uses `grep -r` for pure content searches, `find` when depth limits or type filters are needed. |
-
-**`ssh_find` parameters:**
-- `path` — root path to search from (default: `.`)
-- `name` — filename glob e.g. `*.ts`
-- `content` — search inside files for this string
-- `type` — `"file"`, `"dir"`, or `"any"` (default: `"any"`)
-- `maxDepth` — limit search depth
-- `caseSensitive` — default: `true`
-
----
+| `ssh_list_dir` | List directories via SFTP (`long: true` for metadata). |
+| `ssh_stat` | Stat file or directory metadata. |
+| `ssh_find` | Find by name and/or content. |
 
 ### System
 
 | Tool | Description |
 |---|---|
-| `ssh_ps` | List running processes sorted by CPU usage. Accepts an optional `filter` string and `limit`. |
-| `ssh_df` | Show disk space usage. Optionally scoped to a specific path. |
-| `ssh_env` | Dump the environment variables of a named session. Accepts an optional `filter` pattern. |
+| `ssh_ps` | List running processes (optional filter and limit). |
+| `ssh_df` | Show disk usage. |
+| `ssh_env` | Dump environment variables for a named shell session. |
 
----
-
-### Connection management
+### SSH host discovery
 
 | Tool | Description |
 |---|---|
-| `ssh_status` | Show connection state, open sessions, and the cwd + user of each shell. |
-| `ssh_reconnect` | Re-establish the SSH connection and all sessions. Pass `session` to reconnect only one named session. |
+| `ssh_host_list` | List hosts discovered from `~/.ssh/config` and `~/.ssh/known_hosts`. |
+| `ssh_host_info` | Show merged SSH config/known_hosts details for one alias or host. |
+| `ssh_host_check` | Generate a local SSH connectivity check command. |
+
+### Connection and profile management
+
+| Tool | Description |
+|---|---|
+| `ssh_status` | Show active profile, connection state, sessions, and shell cwd/user snapshots. |
+| `ssh_reconnect` | Reconnect one session or the full connection stack. |
+| `ssh_server_list` | List configured server profiles and active profile. |
+| `ssh_server_add` | Add/update a server profile, optionally activate it. |
+| `ssh_server_use` | Switch active profile and reconnect immediately. |
+| `ssh_server_remove` | Remove a server profile (cannot remove the last one). |
 
 ---
 
 ## Sessions
 
-Named sessions let Claude maintain multiple independent shell contexts in parallel:
+Named sessions are independent shell contexts on the currently active server profile:
 
-```
+```txt
 ssh_exec(command="cd /app && npm run dev", session="server")
 ssh_exec(command="cd /app && npm test", session="tests")
 ```
 
-Each session has its own shell process with its own cwd, environment, and state. The `"default"` session is used when no name is specified.
+Switching profile with `ssh_server_use` reconnects and resets shell session processes against the new server.
+
+---
+
+## Environment variables
+
+| Variable | Required | Description |
+|---|---|---|
+| `SSH_HOST` | Bootstrap fallback | Legacy bootstrap host (used if profile file is empty) |
+| `SSH_USER` | Bootstrap fallback | Legacy bootstrap username |
+| `SSH_PASSWORD` | Optional | Password auth for bootstrap profile |
+| `SSH_KEY_PATH` | Optional | Key auth for bootstrap profile |
+| `SSH_PORT` | Optional | Port for bootstrap profile (default `22`) |
+| `SSH_PROFILE` | Optional | Name for bootstrap profile (default `default`) |
+| `SSH_SERVERS_FILE` | Optional | Override profile file path |
+| `SSH_POLICY_FILE` | Optional | Override policy file path (default `~/.ssh-mcp/policy.json`) |
+| `SSH_AUDIT_FILE` | Optional | Override audit log path (default `~/.ssh-mcp/audit.log.jsonl`) |
+
+---
+
+## Security policy
+
+Policy is optional. If no policy file exists, tools behave as normal. When present, the JSON policy can restrict command execution, remote paths, and write operations globally or per server profile.
+
+Example `~/.ssh-mcp/policy.json`:
+
+```json
+{
+  "deniedCommands": ["rm\\s+-rf\\s+/"],
+  "allowedRemotePaths": ["/srv/app", "/var/log"],
+  "readOnlyMode": false,
+  "profiles": {
+    "prod": {
+      "readOnlyMode": true,
+      "allowedCommands": ["^(ls|cat|tail|grep|df|ps)\\b"]
+    }
+  }
+}
+```
+
+Remote path restrictions are enforced on file, directory, search, tail, chmod, move, and delete tools. Command restrictions are enforced on direct command execution, sudo execution, and system command tools.
+
+---
+
+## Audit logging
+
+Command and file operations append structured JSONL records to `~/.ssh-mcp/audit.log.jsonl` by default. Command logs store SHA256 command hashes and metadata rather than raw command text.
 
 ---
 
 ## Development
 
 ```bash
-npm run build      # compile to dist/
-npm test           # unit + MCP-layer tests (no SSH needed)
-npm run test:integration  # real SSH tests (requires a live server)
-```
-
-Unit and MCP-layer tests run with no SSH connection — no setup needed.
-
-Integration tests require a real server. Copy `.env.example` to `.env` and fill in your credentials:
-
-```bash
-cp .env.example .env
-# edit .env with your SSH_HOST, SSH_USER, SSH_PASSWORD
+npm run build
+npm test
 npm run test:integration
 ```
 
-The `.env` file is only read by the test runner — it is not used by the MCP server itself. Integration tests are automatically skipped when `SSH_HOST` is not set.
+Integration tests require a real SSH server.
+
+Copy `.env.example` to `.env`, fill credentials, then run `npm run test:integration`.
+
+The `.env` file is consumed by tests only, not by the MCP runtime unless your launch environment explicitly exports those variables.
 
 ---
 
 ## Architecture
 
-```
+```txt
 src/
   index.ts          — entry point, registers all tool groups
-  config.ts         — env var parsing, SSH ConnectConfig
-  connection.ts     — SSH Client singleton with reconnect/waiter queue
-  shell.ts          — persistent ShellSession, serial command queue, marker-based output parsing
-  sftp.ts           — SFTPWrapper singleton
+  config.ts         — server profile store + active SSH config
+  connection.ts     — SSH client singleton
+  shell.ts          — persistent command sessions
+  sftp.ts           — SFTP singleton
   jobs.ts           — background job registry + disk persistence
-  helpers.ts        — q() shell quoting, fmt() result formatting
+  audit.ts          — append-only JSONL audit logger
+  runtime-policy.ts — optional file-backed policy loader
+  policy*.ts        — policy parsing, compilation, and enforcement
+  helpers.ts        — quoting + result formatting
   tools/
     exec.ts         — ssh_exec, ssh_exec_bg
     jobs.ts         — ssh_job_output, ssh_job_list, ssh_job_kill
-    files.ts        — ssh_read_file, ssh_write_file, ssh_edit_file, ssh_delete, ssh_move, ssh_chmod, ssh_tail
-    directory.ts    — ssh_list_dir, ssh_stat, ssh_find
+    files.ts        — file operations
+    directory.ts    — list/stat/find
+    hosts.ts        — ssh_host_list, ssh_host_info, ssh_host_check
+    privileged.ts   — ssh_exec_sudo
     system.ts       — ssh_ps, ssh_df, ssh_env
-    manage.ts       — ssh_status, ssh_reconnect
+    manage.ts       — ssh_status, ssh_reconnect, ssh_server_*
 ```
 
 ---

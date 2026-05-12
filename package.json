@@ -1,13 +1,28 @@
 {
-  "name": "ssh-mcp",
+  "name": "@tavuc/ssh-mcp",
   "version": "1.0.0",
   "description": "MCP server for SSH remote access",
   "type": "module",
   "main": "dist/index.js",
+  "bin": {
+    "ssh-mcp": "./bin/ssh-mcp.js"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "workspaces": [
+    "clients/codex",
+    "clients/claude-code"
+  ],
   "scripts": {
     "build": "tsc",
+    "prepack": "npm run build",
     "dev": "tsx src/index.ts",
     "start": "node dist/index.js",
+    "install:clients": "npm install -w codex -w claude-code",
     "test": "vitest run tests/unit tests/mcp",
     "test:integration": "vitest run tests/integration",
     "test:watch": "vitest tests/unit tests/mcp"

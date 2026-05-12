@@ -1,0 +1,8 @@
+{
+  "type": "stdio",
+  "command": "npx",
+  "args": ["-y", "@tavuc/ssh-mcp"],
+  "env": {
+    "SSH_PROFILE": "default"
+  }
+}

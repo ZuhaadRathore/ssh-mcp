@@ -1,0 +1,7 @@
+{
+  "name": "claude-code",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Workspace marker for Claude Code client docs/configuration",
+  "license": "MIT"
+}

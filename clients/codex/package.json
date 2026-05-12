@@ -1,0 +1,7 @@
+{
+  "name": "codex",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Workspace marker for Codex client docs/configuration",
+  "license": "MIT"
+}

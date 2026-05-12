@@ -10,6 +10,7 @@
  *   ssh_read_file  — partial read header format, full-file line count
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { createHash } from "node:crypto";
 import { createTestServer, getText } from "../helpers/server.js";
 import { registerFileTools } from "../../src/tools/files.js";
 
@@ -26,13 +27,51 @@ vi.mock("../../src/shell.js", () => ({
 }));
 
 function mockFileContent(content: string) {
-  mockReadFile.mockImplementation((_path: string, cb: (e: null, b: Buffer) => void) => {
+  mockReadFile.mockImplementation((_path: string, cb: (e: Error | null, b?: Buffer) => void) => {
     cb(null, Buffer.from(content, "utf8"));
   });
-  mockWriteFile.mockImplementation((_path: string, _data: Buffer, cb: (e: null) => void) => {
+  mockWriteFile.mockImplementation((_path: string, _data: Buffer, cb: (e: Error | null) => void) => {
     cb(null);
   });
 }
+
+function sha256(content: string): string {
+  return createHash("sha256").update(content, "utf8").digest("hex");
+}
+
+describe("ssh_write_file — SHA256 preconditions", () => {
+  let callTool: (args: Record<string, unknown>) => Promise<string>;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { client } = await createTestServer(registerFileTools);
+    callTool = (args) =>
+      client.callTool({ name: "ssh_write_file", arguments: args }).then(getText);
+  });
+
+  it("rejects the write when expected_sha256 does not match", async () => {
+    mockFileContent("old content\n");
+    const out = await callTool({
+      path: "/tmp/f.txt",
+      content: "new content\n",
+      expected_sha256: sha256("different content\n"),
+    });
+    expect(out).toContain("SHA256 precondition mismatch");
+    expect(mockWriteFile).not.toHaveBeenCalled();
+  });
+
+  it("allows the write when expected_sha256 matches", async () => {
+    const original = "old content\n";
+    mockFileContent(original);
+    const out = await callTool({
+      path: "/tmp/f.txt",
+      content: "new content\n",
+      expected_sha256: sha256(original),
+    });
+    expect(out).toContain("Written /tmp/f.txt");
+    expect(mockWriteFile).toHaveBeenCalledTimes(1);
+  });
+});
 
 // ssh_edit_file's core guarantee: edits are safe because they require an exact,
 // unambiguous match. These tests verify that guarantee holds.
@@ -101,6 +140,32 @@ describe("ssh_edit_file", () => {
     await callTool({ path: "/tmp/f.txt", old_string: "line one\nline two", new_string: "REPLACED" });
     const written = (mockWriteFile.mock.calls[0] as [string, Buffer, unknown])[1].toString("utf8");
     expect(written).toBe("REPLACED\nline three\n");
+  });
+
+  it("rejects edit when expected_sha256 does not match", async () => {
+    mockFileContent("hello world\n");
+    const out = await callTool({
+      path: "/tmp/f.txt",
+      old_string: "hello",
+      new_string: "hi",
+      expected_sha256: sha256("different\n"),
+    });
+    expect(out).toContain("SHA256 precondition mismatch");
+    expect(mockWriteFile).not.toHaveBeenCalled();
+  });
+
+  it("returns a patch preview and does not write when dry_run is true", async () => {
+    mockFileContent("alpha beta gamma\n");
+    const out = await callTool({
+      path: "/tmp/f.txt",
+      old_string: "beta",
+      new_string: "BETA",
+      dry_run: true,
+    });
+    expect(out).toContain("Dry run: would edit /tmp/f.txt");
+    expect(out).toContain("--- /tmp/f.txt");
+    expect(out).toContain("+++ /tmp/f.txt");
+    expect(mockWriteFile).not.toHaveBeenCalled();
   });
 });
 
