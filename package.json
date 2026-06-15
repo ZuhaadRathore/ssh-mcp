@@ -1,5 +1,5 @@
 {
-  "name": "@tavuc/ssh-mcp",
+  "name": "@zuhaadrathore/ssh-mcp",
   "version": "1.0.0",
   "description": "MCP server for SSH remote access",
   "type": "module",

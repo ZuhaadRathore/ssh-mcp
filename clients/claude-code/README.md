@@ -10,13 +10,13 @@ This workspace exists so npm workspace filters can target Claude Code-specific s
 Print a Claude-ready MCP snippet:
 
 ```bash
-npx -y @tavuc/ssh-mcp init --client claude
+npx -y @zuhaadrathore/ssh-mcp init --client claude
 ```
 
 Write a starter snippet file:
 
 ```bash
-npx -y @tavuc/ssh-mcp init --client claude --write
+npx -y @zuhaadrathore/ssh-mcp init --client claude --write
 ```
 
 This writes:
@@ -41,7 +41,7 @@ The generated server object uses:
 {
   "type": "stdio",
   "command": "npx",
-  "args": ["-y", "@tavuc/ssh-mcp"],
+  "args": ["-y", "@zuhaadrathore/ssh-mcp"],
   "env": {
     "SSH_PROFILE": "default"
   }

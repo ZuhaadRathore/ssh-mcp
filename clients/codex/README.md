@@ -10,13 +10,13 @@ This workspace exists so npm workspace filters can target Codex-specific setup f
 Print a Codex-ready MCP snippet:
 
 ```bash
-npx -y @tavuc/ssh-mcp init --client codex
+npx -y @zuhaadrathore/ssh-mcp init --client codex
 ```
 
 Write a starter snippet file:
 
 ```bash
-npx -y @tavuc/ssh-mcp init --client codex --write
+npx -y @zuhaadrathore/ssh-mcp init --client codex --write
 ```
 
 This writes:
@@ -30,7 +30,7 @@ The generated server block uses:
 ```toml
 [mcp_servers.ssh_remote]
 command = "npx"
-args = ["-y", "@tavuc/ssh-mcp"]
+args = ["-y", "@zuhaadrathore/ssh-mcp"]
 env = { SSH_PROFILE = "default" }
 ```
 

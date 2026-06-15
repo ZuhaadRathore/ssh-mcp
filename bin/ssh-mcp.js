@@ -119,13 +119,13 @@ function runInit(args) {
   const snippets = {
     codex: `[mcp_servers.ssh_remote]
 command = "npx"
-args = ["-y", "@tavuc/ssh-mcp"]
+args = ["-y", "@zuhaadrathore/ssh-mcp"]
 env = { SSH_PROFILE = "default" }
 `,
     claude: `{
   "type": "stdio",
   "command": "npx",
-  "args": ["-y", "@tavuc/ssh-mcp"],
+  "args": ["-y", "@zuhaadrathore/ssh-mcp"],
   "env": {
     "SSH_PROFILE": "default"
   }
@@ -178,7 +178,7 @@ env = { SSH_PROFILE = "default" }
 }
 
 function printSnippets(snippets, targets) {
-  process.stdout.write("Starter MCP config snippets for @tavuc/ssh-mcp (npx -y):\n\n");
+  process.stdout.write("Starter MCP config snippets for @zuhaadrathore/ssh-mcp (npx -y):\n\n");
   if (targets.includes("codex")) {
     process.stdout.write("=== Codex (~/.codex/config.toml) ===\n");
     process.stdout.write(snippets.codex);
