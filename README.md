@@ -28,13 +28,15 @@ command = "npx"
 args = ["-y", "@zuhaadrathore/ssh-mcp"]
 ```
 
-Then add your first server in the AI chat:
+Then, in your AI client's **chat window** (not a terminal), type a plain-English message describing the server you want to add — the AI turns it into a tool call for you. For example, type this into Claude Code or Codex chat:
 
 ```
 Add an SSH server: host=your.server.com user=youruser key=~/.ssh/id_rsa
 ```
 
-Or use env vars to bootstrap on first launch (see [Environment variables](#environment-variables)).
+(Swap in your real host/user/key path.) Anything similarly worded works — the model maps it to the `ssh_server_add` tool.
+
+Alternatively, skip the chat step and bootstrap a server automatically on launch using env vars — see [Environment variables](#environment-variables) below for what they do and where to set them.
 
 ---
 
@@ -54,7 +56,7 @@ Once connected, your AI client can:
 
 ## Server profiles
 
-Profiles are stored in `~/.ssh-mcp/servers.json`. Manage them through the AI:
+Profiles are stored in `~/.ssh-mcp/servers.json`. Manage them by typing plain-English requests into your AI client's chat — not by running shell commands:
 
 ```
 List my SSH servers
@@ -63,15 +65,35 @@ Switch to prod
 Remove the staging server
 ```
 
-Or use env vars for a one-off bootstrap (profile is created on first launch, then managed in the profile file):
+Or use env vars for a one-off bootstrap (profile is created on first launch, then managed in the profile file).
+
+These aren't shell-exported variables — they go in the `"env"` block of the MCP server config you registered in [Quickstart](#quickstart). For Claude Code, that means re-running `claude mcp add-json` with an `"env"` key added:
 
 ```bash
-SSH_HOST=your.server.com
-SSH_USER=youruser
-SSH_KEY_PATH=/path/to/key   # or SSH_PASSWORD=...
-SSH_PORT=22                  # optional, default 22
-SSH_PROFILE=default          # optional, names the profile
+claude mcp add-json -s user ssh-remote '{
+  "type": "stdio",
+  "command": "npx",
+  "args": ["-y", "@zuhaadrathore/ssh-mcp"],
+  "env": {
+    "SSH_HOST": "your.server.com",
+    "SSH_USER": "youruser",
+    "SSH_KEY_PATH": "/path/to/key",
+    "SSH_PORT": "22",
+    "SSH_PROFILE": "default"
+  }
+}'
 ```
+
+For Codex, add the same keys under `env = { ... }` in the `[mcp_servers.ssh_remote]` block in `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.ssh_remote]
+command = "npx"
+args = ["-y", "@zuhaadrathore/ssh-mcp"]
+env = { SSH_HOST = "your.server.com", SSH_USER = "youruser", SSH_KEY_PATH = "/path/to/key" }
+```
+
+`SSH_KEY_PATH` or `SSH_PASSWORD` is required; `SSH_PORT` and `SSH_PROFILE` are optional. This config is only read once — after the profile exists in `~/.ssh-mcp/servers.json`, edit it through the AI chat instead.
 
 ---
 
